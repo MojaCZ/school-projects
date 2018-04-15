@@ -5,7 +5,7 @@ import (
 	"image/png"
 	// "image/draw"
 	"errors"
-	// "fmt"
+	"fmt"
 	"image/color"
 	"log"
 	"os"
@@ -14,8 +14,8 @@ import (
 // basic colors
 var (
 	red    = color.RGBA{255, 0, 0, 255}
-	blue   = color.RGBA{0, 255, 0, 255}
-	green  = color.RGBA{0, 0, 255, 255}
+	green   = color.RGBA{0, 255, 0, 255}
+	blue  = color.RGBA{0, 0, 255, 255}
 	redT   = color.RGBA{255, 0, 0, 100}
 	blueT  = color.RGBA{0, 255, 0, 100}
 	greenT = color.RGBA{0, 0, 255, 100}
@@ -54,7 +54,7 @@ func NewIris(imgPath string) (I *iris) {
 // GiveHist is function that scan whole image and create hist of
 // first parameter is color, it is given as rune 'R' red, 'G' green, 'B' blue, 'g' gray
 // color tells us which part of RGB we want to consider to histogram
-func (I iris) GiveHist(col rune, n uint8) []uint {
+func (I iris) GiveHist(col rune, n uint8) (H *hist) {
 	var F func(int, int) uint8
 	if n < 0 || n > 255 {
 		log.Fatalln(errors.New("Histogram can be conposed only from n ∈ (0, 255)"))
@@ -93,22 +93,79 @@ func (I iris) GiveHist(col rune, n uint8) []uint {
 	// get properties of image
 	width := I.img.Bounds().Size().X
 	height := I.img.Bounds().Size().Y
-	hist := make([]uint, n)
-	window := 255 / n
+
+	h := make([]uint, n)
+	window := 255 / float32(n-1)
 	for i := 0; i < width; i++ {
 		for j := 0; j < height; j++ {
 			px := F(i, j)
-			wNumber := px / window
+			wNumber := float32(px) / window
 
-			if wNumber >= n {
+			if wNumber >= float32(n) {
+				fmt.Println(wNumber, n)
 				continue
 			}
 
-			hist[wNumber]++
+			h[int(wNumber)]++
 		}
 	}
-	return hist
+	H = NewHist(h)
+	return H
 }
+
+type hist struct {
+	hist []uint
+	MaxN uint
+	Min  uint8
+	Max  uint8
+}
+
+func NewHist(h []uint) (H *hist) {
+	H = new(hist)
+	H.hist = h
+	return H
+}
+
+func (H *hist) MaxNum() {
+	for _, e := range H.hist {
+		if e > H.MaxN {
+			H.MaxN = e
+		}
+	}
+}
+
+func (H *hist) MinMax() {
+
+	if H.MaxN == 0 {
+		H.MaxNum()
+	}
+
+	haveMin := false
+	var min, max int
+	for i, e := range H.hist {
+		// HOW TO KNOW THIS NUMBER??? ---------------------------------
+		if e > H.MaxN/150 {
+			if !haveMin {
+				min = i
+				haveMin = true
+			}
+			max = i
+		}
+	}
+	H.Min = uint8(min)
+	H.Max = uint8(max)
+	fmt.Println(H.Min, H.Max)
+}
+
+// OPTIMIZE THIS
+func (H hist) Neco() {
+	var sum uint
+	for _, e := range H.hist {
+		sum += e
+	}
+	fmt.Println(sum)
+}
+
 
 type canvas struct {
 	pic *image.RGBA
@@ -191,7 +248,6 @@ func (C *canvas) DrawHist(hist []uint, col color.RGBA) {
 	for j := minY; j < maxY; j++ {
 		C.pic.Set(x, j, black)
 	}
-
 }
 
 func maxSlice(s []uint) (max uint) {
@@ -204,11 +260,17 @@ func maxSlice(s []uint) (max uint) {
 }
 
 func main() {
-	I := NewIris("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_1.iris.norm.png")
-	hist := I.GiveHist('B', 100)
-
-	C := NewCanvas()
-	C.DrawHist(hist, blue)
-	C.SaveCanvas("testB.png")
-	// processImg(, saveHist)
+	I1 := NewIris("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_1.iris.norm.png")
+	HB1 := I1.GiveHist('B', 200)
+	I2 := NewIris("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png")
+	// I2 := NewIris("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png")
+	HB2 := I2.GiveHist('B', 200)
+	HB1.Neco()
+	HB2.Neco()
+	C1 := NewCanvas()
+	C2 := NewCanvas()
+	C1.DrawHist(HB1.hist, blue)
+	C2.DrawHist(HB2.hist, blue)
+	C1.SaveCanvas("compare1.png")
+	C2.SaveCanvas("compare2.png")
 }
