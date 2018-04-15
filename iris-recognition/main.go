@@ -95,16 +95,16 @@ func (I iris) GiveHist(col rune, n uint8) (H *hist) {
 	height := I.img.Bounds().Size().Y
 
 	h := make([]uint, n)
-	window := 255 / float32(n-1)
+	window := 256 / float32(n)
 	for i := 0; i < width; i++ {
 		for j := 0; j < height; j++ {
 			px := F(i, j)
-			wNumber := float32(px) / window
+			wNumber := px / uint8(window)
 
-			if wNumber >= float32(n) {
-				fmt.Println(wNumber, n)
-				continue
-			}
+			// if wNumber >= n-1 {
+			// 	fmt.Println(wNumber, px, window, n)
+			// 	continue
+			// }
 
 			h[int(wNumber)]++
 		}
