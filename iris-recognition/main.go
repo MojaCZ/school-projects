@@ -4,56 +4,101 @@ import (
 	"image"
 	"image/png"
 	// "image/draw"
-	"fmt"
+	"errors"
+	// "fmt"
 	"image/color"
 	"log"
 	"os"
 )
 
-func main() {
+// basic colors
+var (
+	red    = color.RGBA{255, 0, 0, 255}
+	blue   = color.RGBA{0, 255, 0, 255}
+	green  = color.RGBA{0, 0, 255, 255}
+	redT   = color.RGBA{255, 0, 0, 100}
+	blueT  = color.RGBA{0, 255, 0, 100}
+	greenT = color.RGBA{0, 0, 255, 100}
+	black  = color.RGBA{0, 0, 0, 255}
+	white  = color.RGBA{255, 255, 255, 255}
+)
+
+// ieis is structure keeping information about image and it's path
+type iris struct {
+	img     image.Image
+	imgPath string
+}
+
+// NewIris is constructor for iris struct
+// requires path to image
+// returns pointer to iris structure
+func NewIris(imgPath string) (I *iris) {
+	I = new(iris)
+	I.imgPath = imgPath
+
 	// load file
-	f, err := os.Open("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_1.iris.norm.png")
+	f, err := os.Open(imgPath)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer f.Close()
 
 	// decode image
-	pic, err := png.Decode(f)
+	I.img, err = png.Decode(f)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	fmt.Println(hist(pic, 255))
-
-	// display HIST
-	img := image.NewRGBA(image.Rect(0, 0, 1000, 500))
-
-	drawHist(img, hist(pic, 50), color.RGBA{255, 0, 0, 255})
-
-	// save to file
-	fH, err := os.Create("hist.png")
-	if err != nil {
-		log.Fatalln(err)
-	}
-	defer fH.Close()
-	png.Encode(fH, img)
+	return I
 }
 
-func hist(pic image.Image, n int) []int {
-	// get properties of image
-	width := pic.Bounds().Size().X
-	height := pic.Bounds().Size().Y
-	hist := make([]int, n)
-	window := 255 / n
-	fmt.Println(1 / window)
-	fmt.Printf("%T", window)
+// GiveHist is function that scan whole image and create hist of
+// first parameter is color, it is given as rune 'R' red, 'G' green, 'B' blue, 'g' gray
+// color tells us which part of RGB we want to consider to histogram
+func (I iris) GiveHist(col rune, n uint8) []uint {
+	var F func(int, int) uint8
+	if n < 0 || n > 255 {
+		log.Fatalln(errors.New("Histogram can be conposed only from n ∈ (0, 255)"))
+	}
 
+	switch col {
+	case 'R':
+		F = func(i, j int) uint8 {
+			r, _, _, _ := I.img.At(i, j).RGBA()
+			r = r / 257
+			return uint8(r)
+		}
+	case 'G':
+		F = func(i, j int) uint8 {
+			_, g, _, _ := I.img.At(i, j).RGBA()
+			g = g / 257
+			return uint8(g)
+		}
+	case 'B':
+		F = func(i, j int) uint8 {
+			_, _, b, _ := I.img.At(i, j).RGBA()
+			b = b / 257
+			return uint8(b)
+		}
+	case 'g':
+		F = func(i, j int) uint8 {
+			r, g, b, _ := I.img.At(i, j).RGBA()
+			r, g, b = r/257, g/257, b/257
+			pxG := uint8(0.299*float32(r) + 0.587*float32(g) + 0.114*float32(b))
+			return pxG
+		}
+	default:
+		log.Fatalln(errors.New("Histogram can be construct only from R, B, G or g (gray) colors "))
+	}
+
+	// get properties of image
+	width := I.img.Bounds().Size().X
+	height := I.img.Bounds().Size().Y
+	hist := make([]uint, n)
+	window := 255 / n
 	for i := 0; i < width; i++ {
 		for j := 0; j < height; j++ {
-			r, g, b, _ := pic.At(i, j).RGBA()
-			r, g, b = r/257, g/257, b/257
-			pxG := int(0.299*float64(r) + 0.587*float64(g) + 0.114*float64(b))
-			wNumber := pxG / window
+			px := F(i, j)
+			wNumber := px / window
 
 			if wNumber >= n {
 				continue
@@ -65,26 +110,40 @@ func hist(pic image.Image, n int) []int {
 	return hist
 }
 
-func drawHist(img *image.RGBA, hist []int, col color.RGBA) {
-	// X := img.Bounds().Size().X
-	// Y := img.Bounds().Size().Y
-	fmt.Println("len of hist is: ", len(hist))
-	drawFrame(img)
-	// minX, maxX, minY, maxY := drawAxes(img, col)
-	drawAxes(img, col)
-
-	for i := 0; i < len(hist); i++ {
-		for j := 0; j < 10; j++ {
-			img.Set(i+j+100, hist[i], col)
-		}
-	}
-
+type canvas struct {
+	pic *image.RGBA
 }
 
-func drawAxes(img *image.RGBA, col color.RGBA) (xS, xE, yS, yE int) {
+func NewCanvas() (C *canvas) {
+	C = new(canvas)
+	C.pic = image.NewRGBA(image.Rect(0, 0, 1000, 500))
+	return C
+}
 
-	width := img.Bounds().Size().X
-	height := img.Bounds().Size().Y
+func (C canvas) SaveCanvas(canvasPath string) {
+	// save to file
+	picFile, err := os.Create(canvasPath)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer picFile.Close()
+	png.Encode(picFile, C.pic)
+}
+
+func (C *canvas) DrawFrame() {
+	for i := 0; i < C.pic.Bounds().Size().X; i++ {
+		C.pic.Set(i, 0, black)
+		C.pic.Set(i, C.pic.Bounds().Size().Y-1, black)
+	}
+	for i := 0; i < C.pic.Bounds().Size().Y; i++ {
+		C.pic.Set(0, i, black)
+		C.pic.Set(C.pic.Bounds().Size().X-1, i, black)
+	}
+}
+
+func (C *canvas) DrawAxes(col color.RGBA) (xS, xE, yS, yE int) {
+	width := C.pic.Bounds().Size().X
+	height := C.pic.Bounds().Size().Y
 	x := width / 10
 	y := height / 10
 
@@ -93,32 +152,63 @@ func drawAxes(img *image.RGBA, col color.RGBA) (xS, xE, yS, yE int) {
 	yStart := y / 2
 	yEnd := height - yStart
 
-	for i := xStart; i<xEnd; i++ {
-		img.Set(i, height-y, col)
+	for i := xStart; i < xEnd; i++ {
+		C.pic.Set(i, height-y, col)
 	}
 
-	for i := yStart; i<yEnd; i++ {
-		img.Set(x, i, col)
+	for i := yStart; i < yEnd; i++ {
+		C.pic.Set(x, i, col)
 	}
 
-	return x, width-x, y, height-y
+	return x, width - x, y, height - y
 }
 
-func drawFrame(img *image.RGBA) {
-	for i := 0; i < img.Bounds().Size().X; i++ {
-		img.Set(i, 0, color.RGBA{0, 0, 0, 255})
-		img.Set(i, img.Bounds().Size().Y-1, color.RGBA{0, 0, 0, 255})
-	}
-	for i := 0; i < img.Bounds().Size().Y; i++ {
-		img.Set(0, i, color.RGBA{0, 0, 0, 255})
-		img.Set(img.Bounds().Size().X-1, i, color.RGBA{0, 0, 0, 255})
-	}
-}
-
-func drawRect(img *image.RGBA, startX, startY, endX, endY int, fill bool, col color.RGBA) {
+func (C *canvas) DrawRect(startX, startY, endX, endY int, col color.RGBA) {
 	for i := startX; i < endX; i++ {
-		for j := startY; j < endY; j++ {
-			
+		for j := endY; j < startY; j++ {
+			C.pic.Set(i, j, col)
 		}
 	}
+}
+
+func (C *canvas) DrawHist(hist []uint, col color.RGBA) {
+	C.DrawFrame()
+	minX, maxX, minY, maxY := C.DrawAxes(black)
+	space := (maxX - minX) / len(hist) / 2
+
+	// get ratio and resize histogram
+	scaleHist := hist
+	ratio := float32(maxY-minY) / float32(maxSlice(hist))
+	for i, _ := range scaleHist {
+		scaleHist[i] = uint(ratio * float32(scaleHist[i]))
+	}
+
+	x := minX + space
+	for i := 0; i < len(hist); i++ {
+		C.DrawRect(x, maxY, x+space, maxY-int(scaleHist[i]), col)
+		x += 2 * space
+	}
+	for j := minY; j < maxY; j++ {
+		C.pic.Set(x, j, black)
+	}
+
+}
+
+func maxSlice(s []uint) (max uint) {
+	for _, e := range s {
+		if e > max {
+			max = e
+		}
+	}
+	return max
+}
+
+func main() {
+	I := NewIris("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_1.iris.norm.png")
+	hist := I.GiveHist('B', 100)
+
+	C := NewCanvas()
+	C.DrawHist(hist, blue)
+	C.SaveCanvas("testB.png")
+	// processImg(, saveHist)
 }
