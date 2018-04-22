@@ -1,10 +1,46 @@
 // g++ iris.cpp -o iris -std=c++11 `pkg-config --cflags --libs opencv`
 #include <iostream>
+#include <string>
 #include <opencv2/highgui.hpp>
+#include <dirent.h>
+#include <unistd.h>
+#include <sys/types.h>
 
 int compare(cv::Mat, cv::Mat, int);
 
 int main(int argc, char const *argv[]) {
+
+  // get current working directory and append relative path to files
+  char cwd[1024];
+  std::string imagesDir(cwd);
+  getcwd(cwd, sizeof(cwd)) != NULL;
+  imagesDir.append("/irises_MICHE_iPhone5_norm/");
+  // get all fileNames in directory
+  // std::vector<std::string> imagesV; // vector of files in directory
+  DIR* dirp = opendir(strdup(imagesDir.c_str()));
+  struct dirent * dp;
+  std::cout<<"AHOJ"<<std::endl;
+  while ((dp = readdir(dirp)) != NULL) {
+    // imagesV.push_back(dp->d_name);
+    std::cout << dp->d_name << std::endl;
+  }
+  closedir(dirp);
+
+  //
+  // for (int i=0; i<imagesV.size(); i++) {
+  //   std::cout << imagesV[i] << std::endl;
+  // }
+
+
+  // for (std::vector<std::string>::const_iterator i = v.begin(); i != v.end();i++) {
+  //   std::cout << *i << " ------- " << *(i+1) << std::endl;
+  //   if (i+1 == v.end()) {
+  //     break;
+  //   }
+  //
+  // }
+  // for (auto i = v.begin(); i != v.end()-1; i++) {
+  // }
 
   const int WINDOW = 30;
 
@@ -30,7 +66,7 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
 
-  compare(image1, image2, WINDOW);
+  // compare(image1, image2, WINDOW);
 
   // set variables
   std::cout << "window size: " << WINDOW << std::endl;
@@ -38,8 +74,8 @@ int main(int argc, char const *argv[]) {
   std::cout << "height image1: " << image1.rows << " height image2: " << image2.rows << std::endl;
 
   // cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
-  cv::imshow("image1", image1);
-  cv::imshow("image2", image2);
+  // cv::imshow("image1", image1);
+  // cv::imshow("image2", image2);
 
   cv::waitKey(0);
   return 0;
