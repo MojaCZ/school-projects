@@ -6,18 +6,20 @@
 #include <dirent.h>
 #include <unistd.h>
 #include <sys/types.h>
+#include <iomanip>
 
 int compare(cv::Mat, cv::Mat, int);
 std::vector<std::string> loadDir(std::string);
 int train(std::vector<std::string>);
 int getMax(cv::Mat, cv::Mat, int (&min)[3], int);
+int compareImages(std::vector<std::string>);
 int compareHistograms(cv::Mat, cv::Mat);
 
 int main(int argc, char const *argv[]) {
 
   std::vector<std::string> paths;
   paths = loadDir("/irises_MICHE_iPhone5_norm/");
-
+  compareImages(paths);
 
   // train(paths);
 
@@ -45,8 +47,8 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
 
-  image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
-  // image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
+  // image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
+  image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
   if (! image2.data) {
     std::cout << "Could not open or find image2" << std::endl;
     return -1;
@@ -56,8 +58,9 @@ int main(int argc, char const *argv[]) {
     std::cout << "dim of picture 1 is not equal to dim of picture2";
     return -1;
   }
-
   compareHistograms(image1, image2);
+
+
   // for (int i=0; i<)
   // compare(image1, image2, WINDOW);
 
@@ -91,6 +94,30 @@ std::vector<std::string> loadDir(std::string relativePath) {
   return paths;
 }
 
+int compareImages(std::vector<std::string> paths) {
+  // each with each
+  for (int i=0; i<paths.size(); i++) {  //paths.size()
+    for (int j=i+1; j<paths.size(); j++) {  //paths.size()
+      if ( paths[i].substr(0,paths[i].size()-16) != paths[j].substr(0,paths[j].size()-16) ) {
+        continue;
+      }
+      cv::Mat img1 = cv::imread(paths[i]);
+      if (! img1.data) {
+        std::cout << "Could not open or find image1" << std::endl;
+        return -1;
+      }
+      cv::Mat img2 = cv::imread(paths[j]);
+      if (! img2.data) {
+        std::cout << "Could not open or find image2" << std::endl;
+        return -1;
+      }
+      std::cout << paths[i].substr(73, 20)  << " VS " << paths[j].substr(73, 20) << ":   ";
+      compareHistograms(img1, img2);
+    }
+  }
+}
+
+// return number
 int compareHistograms(cv::Mat img1, cv::Mat img2) {
   cv::Mat hsv_img1; cv::Mat hsv_img2;
 
@@ -118,13 +145,22 @@ int compareHistograms(cv::Mat img1, cv::Mat img2) {
   cv::normalize( hist_img2, hist_img2, 0, 1, cv::NORM_MINMAX, -1, cv::Mat());
 
   // 0 = correlation, 1 = CHI2, 2 = intersection, 3 = BhattacharyyaD, 4 = synonym
+  // M1 closer to 1 - closer pictures
   double M1 = cv::compareHist( hist_img1, hist_img2, 0);
+  // M2 smaller - closer
   double M2 = cv::compareHist( hist_img1, hist_img2, 1);
+  // M3 bigger - closer
   double M3 = cv::compareHist( hist_img1, hist_img2, 2);
+  // M4 smaller - closer
   double M4 = cv::compareHist( hist_img1, hist_img2, 3);
+  // M5 smaller - closer
   double M5 = cv::compareHist( hist_img1, hist_img2, 4);
 
-  std::cout << "comparison:\t" << M1 << "\t" << M2 << "\t" << M3 << "\t" << M4 << "\t" << M5 << std::endl;
+  if (M1 < 0.5) {
+    std::cout << std::setw(8) << M1 << std::setw(10) << M2 << std::setw(10) << M3 << std::setw(10) << M4 << std::setw(10) << M5 << std::endl;
+    return 0;
+  }
+  return 1;
 }
 
 int train(std::vector<std::string> paths) {
