@@ -14,26 +14,14 @@ int train(std::vector<std::string>);
 int getMax(cv::Mat, cv::Mat, int (&min)[3], int);
 int compareImages(std::vector<std::string>);
 int compareHistograms(cv::Mat, cv::Mat);
+int plot(std::vector<int>, std::vector<int>);
+int plotVectorToImg(cv::Mat, std::vector<int>, int, int, cv::Vec3b);
 
 int main(int argc, char const *argv[]) {
 
   std::vector<std::string> paths;
   paths = loadDir("/irises_MICHE_iPhone5_norm/");
-  compareImages(paths);
-
-  // train(paths);
-
-
-  // for (int i=2; i<paths.size(); i++) {
-  //   // std::cout << v[i] << std::endl;
-  //   // std::cout << v[i].substr(0,v[i].find("/",0)) << std::endl;
-  //
-  //   std::string ID = paths[i].substr(0, paths[i].find("/",0));
-  //   if (ID.substr(0,ID.find("_",0)) == "001") {
-  //     std::cout << ID << std::endl;
-  //   }
-  //   // std::cout << ID.substr(0,ID.find("_",0)) << std::endl;
-  // }
+  // compareImages(paths);
 
   const int WINDOW = 50;
 
@@ -47,8 +35,8 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
 
-  // image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
-  image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
+  image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
+  // image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
   if (! image2.data) {
     std::cout << "Could not open or find image2" << std::endl;
     return -1;
@@ -58,8 +46,16 @@ int main(int argc, char const *argv[]) {
     std::cout << "dim of picture 1 is not equal to dim of picture2";
     return -1;
   }
-  compareHistograms(image1, image2);
+  // compareHistograms(image1, image2);
 
+  std::vector<int> V1, V2;
+  for (int i=0; i<image1.cols; i++) {
+    int px1 = image1.at<cv::Vec3b>(0, i)[0];
+    int px2 = image2.at<cv::Vec3b>(0, i)[0];
+    V1.push_back(px1);
+    V2.push_back(px2);
+  }
+  plot(V1, V2);
 
   // for (int i=0; i<)
   // compare(image1, image2, WINDOW);
@@ -98,7 +94,9 @@ int compareImages(std::vector<std::string> paths) {
   // each with each
   for (int i=0; i<paths.size(); i++) {  //paths.size()
     for (int j=i+1; j<paths.size(); j++) {  //paths.size()
-      if ( paths[i].substr(0,paths[i].size()-16) != paths[j].substr(0,paths[j].size()-16) ) {
+
+      // check just images of one iris
+      if ( paths[i].substr(0,paths[i].size()-16) == paths[j].substr(0,paths[j].size()-16) ) {
         continue;
       }
       cv::Mat img1 = cv::imread(paths[i]);
@@ -156,10 +154,23 @@ int compareHistograms(cv::Mat img1, cv::Mat img2) {
   // M5 smaller - closer
   double M5 = cv::compareHist( hist_img1, hist_img2, 4);
 
+  std::cout << std::setw(8) << M1 << std::setw(10) << M2 << std::setw(10) << M3 << std::setw(10) << M4 << std::setw(10) << M5;
   if (M1 < 0.5) {
-    std::cout << std::setw(8) << M1 << std::setw(10) << M2 << std::setw(10) << M3 << std::setw(10) << M4 << std::setw(10) << M5 << std::endl;
-    return 0;
+    std::cout << "1 ";
   }
+  if (M2 > 200) {
+    std::cout << "2 ";
+  }
+  if (M3 < 10) {
+    std::cout << "3 ";
+  }
+  if (M4 > 0.5) {
+    std::cout << "4 ";
+  }
+  if (M5 > 70) {
+    std::cout << "5 ";
+  }
+  std::cout << std::endl;
   return 1;
 }
 
@@ -240,3 +251,48 @@ int compare(cv::Mat image1, cv::Mat image2, int WINDOW) {
     }
   }
 };
+
+
+// plot will create image and plot vectors into these images
+int plot(std::vector<int> V1, std::vector<int> V2) {
+  // get max vecrot size
+  int size = V1.size();
+  if (V2.size() > size) {
+    size = V2.size();
+  }
+  // init parameters of plot
+  int x_offset = 50, y_offset = 50;
+  int height = 500, width = size + y_offset + 20;
+  cv::Vec3b blue = {255, 0, 0}, green = {0, 255, 0}, red = {0, 0, 255}, black = {0, 0, 0};
+
+  // create image
+  cv::Mat plot(height, width, CV_8UC3, cv::Scalar(255, 255, 255));
+
+  // vertical border
+  for (int j=0; j<height; j++) {
+    plot.at<cv::Vec3b>(cv::Point(y_offset,j)) = black;
+  }
+  // horizontal border
+  for (int i=0; i<width; i++) {
+    plot.at<cv::Vec3b>(cv::Point(i,height-x_offset)) = black;
+  }
+
+  // plot each vector into the image
+  plotVectorToImg(plot, V1, x_offset, y_offset, blue);
+  plotVectorToImg(plot, V2, x_offset, y_offset, red);
+
+  // display image
+  cv::imshow("plot", plot);
+  cv::waitKey(0);
+}
+
+// plotVectorToImg will take image and plot pixel by pixel vector values
+int plotVectorToImg(cv::Mat plot, std::vector<int> v, int x_offset, int y_offset, cv::Vec3b color) {
+
+  // loop over vector and paint pixels ()
+  for (int i=0; i<v.size(); i++) {
+    plot.at<cv::Vec3b>(plot.rows-v[i]-y_offset, i+x_offset) = color;
+    // for better visualization of plots
+    plot.at<cv::Vec3b>(plot.rows-v[i]-y_offset-1, i+x_offset) = color;
+  }
+}
