@@ -8,12 +8,12 @@
 #include <sys/types.h>
 #include <iomanip>
 
-int compare(cv::Mat, cv::Mat, int);
 std::vector<std::string> loadDir(std::string);
-int train(std::vector<std::string>);
-int getMax(cv::Mat, cv::Mat, int (&min)[3], int);
 int compareImages(std::vector<std::string>);
 int compareHistograms(cv::Mat, cv::Mat);
+std::vector<int> vecFromImg(cv::Mat, int);
+std::vector<int> flWindow(std::vector<int>, int);
+std::vector<int> scaleVector(std::vector<int>, int);
 int plot(std::vector<int>, std::vector<int>);
 int plotVectorToImg(cv::Mat, std::vector<int>, int, int, cv::Vec3b);
 
@@ -35,7 +35,8 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
 
-  image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
+  // image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
+  image2 = cv::imread("irises_MICHE_iPhone5_norm/008_IP5_IN_R_LI_01_1.iris.norm.png");
   // image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
   if (! image2.data) {
     std::cout << "Could not open or find image2" << std::endl;
@@ -49,22 +50,19 @@ int main(int argc, char const *argv[]) {
   // compareHistograms(image1, image2);
 
   std::vector<int> V1, V2;
-  for (int i=0; i<image1.cols; i++) {
-    int px1 = image1.at<cv::Vec3b>(0, i)[0];
-    int px2 = image2.at<cv::Vec3b>(0, i)[0];
-    V1.push_back(px1);
-    V2.push_back(px2);
-  }
-  plot(V1, V2);
+  V1 = vecFromImg(image1, 10);
+  V2 = vecFromImg(image2, 10);
 
-  // for (int i=0; i<)
-  // compare(image1, image2, WINDOW);
+  V1 = flWindow(V1, 150);
+  V2 = flWindow(V2, 150);
+
+  plot(V1, V2);
 
   // cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
   // cv::imshow("image1", image1);
   // cv::imshow("image2", image2);
 
-  cv::waitKey(0);
+  // cv::waitKey(0);
   return 0;
 }
 
@@ -174,92 +172,46 @@ int compareHistograms(cv::Mat img1, cv::Mat img2) {
   return 1;
 }
 
-int train(std::vector<std::string> paths) {
-  // if I have 815 files in dir, and I want to compare each with each,
-  // C(815,2) = (815*814)/(2!) = 331705 of combinations
+std::vector<int> vecFromImg(cv::Mat img, int window) {
+  std::vector<int> V;
 
-  int min[3] = {255,255,255}, max[3] = {0, 0, 0};
-  // different window
+  // convert image to greyscale
+  cv::Mat greyImg;
+  cv::cvtColor(img, greyImg, cv::COLOR_RGB2GRAY);
 
-  // each with each
-  for (int i=0; i<paths.size(); i++) {  //paths.size()
-    for (int j=i+1; j<paths.size(); j++) {  //paths.size()
-      cv::Mat img1 = cv::imread(paths[i]);
-      cv::Mat img2 = cv::imread(paths[j]);
-      getMax(img1, img2, max, 20);
-      std::cout << "MAX IS: [" << max[0] << ", " << max[1] << ", " << max[2] << "]" << std::endl;
-    }
-  }
-    // find min max average
-}
+  int windowSize = window * window;
+  // std::cout << (int)greyImg.at<uchar>(50, 50) << std::endl;
 
-int getMax(cv::Mat img1, cv::Mat img2, int (&max)[3], int WINDOW) {
-  int windowSize = WINDOW * WINDOW;
-  for (int j=0; j<img1.cols-WINDOW; j++) {
-    for (int i=0; i<img1.rows-WINDOW; i++) {
-      int B1=0, G1=0, R1 = 0;
-      int B2=0, G2=0, R2 = 0;
-      for (int y=j; y<j+WINDOW-1; y++) {
-        for (int x=i; x<i+WINDOW-1; x++) {
-          cv::Vec3b px1 = img1.at<cv::Vec3b>(x, y);
-          cv::Vec3b px2 = img2.at<cv::Vec3b>(x, y);
-          B1 += px1[0]; G1 += px1[1]; R1 += px1[2];
-          B2 += px2[0]; G2 += px2[1]; R2 += px2[2];
+  for (int j=0; j<img.cols-window; j++) {
+    for (int i=0; i<img.rows-window; i++) {
+      int S = 0;
+      for (int y=j; y<j+window; y++) {  // WINDOW-1
+        for (int x=i; x<i+window; x++) {  //WINDOW-1
+          S += (int)greyImg.at<uchar>(x, y);
         }
       }
-
-      int B1A = B1/windowSize, G1A = G1/windowSize, R1A = R1/windowSize; // get averageas of image pixel in each color
-      int B2A = B2/windowSize, G2A = G2/windowSize, R2A = R2/windowSize;
-      int diffB = abs(B1A - B2A), diffG = abs(G1A - G2A), diffR = abs(B1A - B2A);
-      // std::cout << "diffR: " << diffR << " diffG: " << diffG << " diffB: " << std::endl;
-      if (diffB > max[0]) { max[0] = diffB;}
-      // if (diffR > max[0]) { max[0] = diffR; std::cout << "new max R " << diffR << std::endl;}
-
-      if (diffG > max[1]) { max[1] = diffG;}
-
-      if (diffR > max[2]) { max[2] = diffR;}
+      int A = S / windowSize;
+      V.push_back(A);
     }
   }
-}
-
-int abs(int a) {
-  if (a<0) {
-    return -a;
-  } else {
-    return a;
-  }
-}
-
-int compare(cv::Mat image1, cv::Mat image2, int WINDOW) {
-  int windowSize = WINDOW * WINDOW;
-  // make a window in size of WINDOW, width i
-  for (int j=0; j<image1.cols-WINDOW; j++) {
-    for (int i=0; i<image1.rows-WINDOW; i++) {
-      int R1=0, G1=0, B1 = 0;
-      int R2=0, G2=0, B2 = 0;
-      for (int y=j; y<j+WINDOW-1; y++) {
-        for (int x=i; x<i+WINDOW-1; x++) {
-          cv::Vec3b px1 = image1.at<cv::Vec3b>(x, y);
-          cv::Vec3b px2 = image2.at<cv::Vec3b>(x, y);
-          R1 += px1[0]; G1 += px1[1]; B1 += px1[2];
-          R2 += px2[0]; G2 += px2[1]; B2 += px2[2];
-        }
-      }
-      int R1A = R1/windowSize, G1A = G1/windowSize, B1A = B1/windowSize;
-      int R2A = R2/windowSize, G2A = G2/windowSize, B2A = B2/windowSize;
-      std::cout << "WINDOW: [" << i << " " << j << "] " << " averageas difference img1-img2 [R G B]: " << R1A-R2A << "\t" << G1A-G2A << "\t" << B1A-B2A << std::endl;
-    }
-  }
+  return V;
 };
-
 
 // plot will create image and plot vectors into these images
 int plot(std::vector<int> V1, std::vector<int> V2) {
-  // get max vecrot size
-  int size = V1.size();
-  if (V2.size() > size) {
-    size = V2.size();
+  if (V1.size() != V2.size()) {
+    std::cout << "scale of vectors isn't same" << std::endl;
+    return -1;
   }
+  // get max vecrot size
+  int maxSize = V1.size();
+
+  int scale = maxSize / 1000;
+  V1 = scaleVector(V1, scale);
+  V2 = scaleVector(V2, scale);
+  int size = V1.size();
+  std::cout << "maxSize: " << maxSize << "scale ratio: " << scale << std::endl;
+
   // init parameters of plot
   int x_offset = 50, y_offset = 50;
   int height = 500, width = size + y_offset + 20;
@@ -295,4 +247,32 @@ int plotVectorToImg(cv::Mat plot, std::vector<int> v, int x_offset, int y_offset
     // for better visualization of plots
     plot.at<cv::Vec3b>(plot.rows-v[i]-y_offset-1, i+x_offset) = color;
   }
+  return 1;
+}
+
+std::vector<int> flWindow(std::vector<int> V, int window) {
+  std::vector<int> NV;
+  for (int i=0; i<V.size()-window; i++) {
+    int S = 0;
+    for (int j=i; j<i+window; j++) {
+      S += V[j];
+    }
+    NV.push_back(S/window);
+  }
+  return NV;
+};
+
+// scale down stands for how mych should vector scale, 1 = same, 2 = 1/2, 3 = 1/3 ...
+std::vector<int> scaleVector(std::vector<int> V, int scaleDown) {
+  std::vector<int> NV;
+  for (int i=0; i<V.size()-scaleDown; i=i+scaleDown) {
+    int S = 0;
+    for (int j=i; j<i+scaleDown; j++) {
+      S += V[j];
+    }
+    NV.push_back(S/scaleDown);
+  }
+  std::cout << NV.size() << std::endl;
+  return NV;
+
 }
