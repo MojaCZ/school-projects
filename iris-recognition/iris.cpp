@@ -16,6 +16,7 @@ std::vector<int> flWindow(std::vector<int>, int);
 std::vector<int> scaleVector(std::vector<int>, int);
 int plot(std::vector<int>, std::vector<int>);
 int plotVectorToImg(cv::Mat, std::vector<int>, int, int, cv::Vec3b);
+int DFT(cv::Mat);
 
 int main(int argc, char const *argv[]) {
 
@@ -43,26 +44,31 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
 
+  DFT(image1);
+  DFT(image2);
+
   if (image1.cols != image2.cols || image1.rows != image2.rows) {
     std::cout << "dim of picture 1 is not equal to dim of picture2";
     return -1;
   }
+
   // compareHistograms(image1, image2);
 
-  std::vector<int> V1, V2;
-  V1 = vecFromImg(image1, 10);
-  V2 = vecFromImg(image2, 10);
-
-  V1 = flWindow(V1, 150);
-  V2 = flWindow(V2, 150);
-
-  plot(V1, V2);
+  // std::vector<int> V1, V2;
+  // V1 = vecFromImg(image1, 10);
+  // V2 = vecFromImg(image2, 10);
+  //
+  // V1 = flWindow(V1, 100);
+  // V2 = flWindow(V2, 100);
+  //
+  // plot(V1, V2);
 
   // cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
   // cv::imshow("image1", image1);
-  // cv::imshow("image2", image2);
-
   // cv::waitKey(0);
+  // cv::imshow("image2", image2);
+  // cv::waitKey(0);
+
   return 0;
 }
 
@@ -275,4 +281,56 @@ std::vector<int> scaleVector(std::vector<int> V, int scaleDown) {
   std::cout << NV.size() << std::endl;
   return NV;
 
+}
+
+int DFT(cv::Mat img) {
+  // convert image to greyscale
+  cv::Mat greyImg;
+  cv::cvtColor(img, greyImg, cv::COLOR_RGB2GRAY);
+
+  // expand to optimal size
+  cv::Mat padded;
+  int m = cv::getOptimalDFTSize(greyImg.rows);
+  int n = cv::getOptimalDFTSize(greyImg.cols);
+  cv::copyMakeBorder(greyImg, padded, 0, m-greyImg.rows, 0, n-greyImg.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
+  cv::Mat planes[] = {cv::Mat_<float>(padded), cv::Mat::zeros(padded.size(), CV_32F)};
+  cv::Mat complexI;
+  cv::merge(planes, 2, complexI);
+
+  cv::dft(complexI, complexI);
+
+  cv::split(complexI, planes);
+  cv::magnitude(planes[0], planes[1], planes[0]);
+  cv::Mat magI = planes[0];
+
+  magI += cv::Scalar::all(1);
+
+  magI = magI(cv::Rect(0, 0, magI.cols & -2, magI.rows & -2));
+
+  int cx = magI.cols/2;
+  int cy = magI.rows/2;
+
+  cv::Mat q0(magI, cv::Rect(0, 0, cx, cy));
+  cv::Mat q1(magI, cv::Rect(cx, 0, cx, cy));
+  cv::Mat q2(magI, cv::Rect(0, cy, cx, cy));
+  cv::Mat q3(magI, cv::Rect(cx, cy, cx, cy));
+
+  cv::Mat tmp;
+  q0.copyTo(tmp);
+  q3.copyTo(q0);
+  tmp.copyTo(q3);
+
+  q1.copyTo(tmp);
+  q2.copyTo(q1);
+  tmp.copyTo(q2);
+
+  cv::normalize(magI, magI, 0, 1, cv::NORM_MINMAX);
+  // HOW TO CROP IMAGE SO IT SHOWS ONLY INTERESTING PART OF SPECTRUM
+  cv::Mat zoom;
+  cv::pyrUp(magI, zoom, cv::Size(magI.cols * 2, magI.rows * 2));
+
+  cv::imshow("Input Image", img);
+  cv::imshow("spectrum magnitude", zoom);
+  cv::waitKey();
+  return 0;
 }
