@@ -16,7 +16,7 @@ std::vector<int> flWindow(std::vector<int>, int);
 std::vector<int> scaleVector(std::vector<int>, int);
 int plot(std::vector<int>, std::vector<int>);
 int plotVectorToImg(cv::Mat, std::vector<int>, int, int, cv::Vec3b);
-int DFT(cv::Mat);
+cv::Mat DFT(cv::Mat);
 
 int main(int argc, char const *argv[]) {
 
@@ -36,42 +36,53 @@ int main(int argc, char const *argv[]) {
     return -1;
   }
 
-  // image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
-  image2 = cv::imread("irises_MICHE_iPhone5_norm/008_IP5_IN_R_LI_01_1.iris.norm.png");
+  image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
+  // image2 = cv::imread("irises_MICHE_iPhone5_norm/008_IP5_IN_R_LI_01_1.iris.norm.png");
   // image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
   if (! image2.data) {
     std::cout << "Could not open or find image2" << std::endl;
     return -1;
   }
 
-  DFT(image1);
-  DFT(image2);
-
   if (image1.cols != image2.cols || image1.rows != image2.rows) {
     std::cout << "dim of picture 1 is not equal to dim of picture2";
     return -1;
   }
 
-  // compareHistograms(image1, image2);
+  // >>> DISCREATE FOURIET TRANSFORMATION
+  cv::Mat img1DFT = DFT(image1);
+  cv::Mat img2DFT = DFT(image2);
 
-  // std::vector<int> V1, V2;
-  // V1 = vecFromImg(image1, 10);
-  // V2 = vecFromImg(image2, 10);
-  //
-  // V1 = flWindow(V1, 100);
-  // V2 = flWindow(V2, 100);
-  //
-  // plot(V1, V2);
+  cv::imshow("img1DFT", img1DFT);
+  cv::imshow("img2DFT", img2DFT);
+  cv::waitKey();
 
-  // cv::namedWindow("Display window", cv::WINDOW_AUTOSIZE);
-  // cv::imshow("image1", image1);
-  // cv::waitKey(0);
-  // cv::imshow("image2", image2);
-  // cv::waitKey(0);
+  // >>> COMPARE HISTOGRAMS OF IMAGES:
+
+  compareHistograms(image1, image2);
+
+  // >>> COMPARE BY FLOATING WINDOWS METHOD
+  // load vectors from images
+  std::vector<int> V1, V2;
+  V1 = vecFromImg(image1, 10);
+  V2 = vecFromImg(image2, 10);
+
+  // smoothing graph
+  V1 = flWindow(V1, 100);
+  V2 = flWindow(V2, 100);
+
+  plot(V1, V2);
+
+  // >>> DISPLAY IMAGES
+  cv::imshow("image1", image1);
+  cv::imshow("image2", image2);
+  cv::waitKey(0);
 
   return 0;
 }
 
+// loadDir get relative path, append it to current working directory
+// read all files in directory and retun paths as std::vector<std::string>
 std::vector<std::string> loadDir(std::string relativePath) {
   // get current working directory and append relative path to files
   char cwd[1024];
@@ -94,6 +105,8 @@ std::vector<std::string> loadDir(std::string relativePath) {
   return paths;
 }
 
+// compareImages reads files given in form of filepaths
+// at the end run comparing methods and ....... not done yet
 int compareImages(std::vector<std::string> paths) {
   // each with each
   for (int i=0; i<paths.size(); i++) {  //paths.size()
@@ -119,7 +132,8 @@ int compareImages(std::vector<std::string> paths) {
   }
 }
 
-// return number
+// compareHistograms load histograms from images
+// compare histograms by 5 methods and return number how many tests hists passed
 int compareHistograms(cv::Mat img1, cv::Mat img2) {
   cv::Mat hsv_img1; cv::Mat hsv_img2;
 
@@ -157,39 +171,47 @@ int compareHistograms(cv::Mat img1, cv::Mat img2) {
   double M4 = cv::compareHist( hist_img1, hist_img2, 3);
   // M5 smaller - closer
   double M5 = cv::compareHist( hist_img1, hist_img2, 4);
-
+  int passes = 0;
   std::cout << std::setw(8) << M1 << std::setw(10) << M2 << std::setw(10) << M3 << std::setw(10) << M4 << std::setw(10) << M5;
   if (M1 < 0.5) {
     std::cout << "1 ";
-  }
+  } else {passes++;}
   if (M2 > 200) {
     std::cout << "2 ";
-  }
+  } else {passes++;}
   if (M3 < 10) {
     std::cout << "3 ";
-  }
+  } else {passes++;}
   if (M4 > 0.5) {
     std::cout << "4 ";
-  }
+  } else {passes++;}
   if (M5 > 70) {
     std::cout << "5 ";
-  }
+  } else {passes++;}
   std::cout << std::endl;
-  return 1;
+  return passes;
 }
 
+// vecFromImg runs square window through image and get average value from every window position
+// return vector of averageas
 std::vector<int> vecFromImg(cv::Mat img, int window) {
   std::vector<int> V;
 
-  // convert image to greyscale
+  // convert image to greyscale if not yet
   cv::Mat greyImg;
-  cv::cvtColor(img, greyImg, cv::COLOR_RGB2GRAY);
+  if (img.channels() != 1) {
+    cv::cvtColor(img, greyImg, cv::COLOR_RGB2GRAY);
+    std::cout << "converting to GRAY " << std::endl;
+  } else {
+    greyImg = img;
+    std::cout << "already is in GRAY " << std::endl;
+  }
 
   int windowSize = window * window;
   // std::cout << (int)greyImg.at<uchar>(50, 50) << std::endl;
 
-  for (int j=0; j<img.cols-window; j++) {
-    for (int i=0; i<img.rows-window; i++) {
+  for (int j=0; j<greyImg.cols-window; j++) {
+    for (int i=0; i<greyImg.rows-window; i++) {
       int S = 0;
       for (int y=j; y<j+window; y++) {  // WINDOW-1
         for (int x=i; x<i+window; x++) {  //WINDOW-1
@@ -203,7 +225,8 @@ std::vector<int> vecFromImg(cv::Mat img, int window) {
   return V;
 };
 
-// plot will create image and plot vectors into these images
+// plot will make adjustments on vectors and call plot function to write pixels to image
+// just graphical representation
 int plot(std::vector<int> V1, std::vector<int> V2) {
   if (V1.size() != V2.size()) {
     std::cout << "scale of vectors isn't same" << std::endl;
@@ -244,7 +267,7 @@ int plot(std::vector<int> V1, std::vector<int> V2) {
   cv::waitKey(0);
 }
 
-// plotVectorToImg will take image and plot pixel by pixel vector values
+// plotVectorToImg will take image and write pixels to image (plot)
 int plotVectorToImg(cv::Mat plot, std::vector<int> v, int x_offset, int y_offset, cv::Vec3b color) {
 
   // loop over vector and paint pixels ()
@@ -256,6 +279,7 @@ int plotVectorToImg(cv::Mat plot, std::vector<int> v, int x_offset, int y_offset
   return 1;
 }
 
+// flWindow will smooth data by given window size
 std::vector<int> flWindow(std::vector<int> V, int window) {
   std::vector<int> NV;
   for (int i=0; i<V.size()-window; i++) {
@@ -283,30 +307,38 @@ std::vector<int> scaleVector(std::vector<int> V, int scaleDown) {
 
 }
 
-int DFT(cv::Mat img) {
+// DFT run discreate fourier reansformation on image and return image with spectrum
+cv::Mat DFT(cv::Mat img) {
   // convert image to greyscale
   cv::Mat greyImg;
   cv::cvtColor(img, greyImg, cv::COLOR_RGB2GRAY);
 
-  // expand to optimal size
+  // expand to optimal size (size multiple of numbers two, three and five)
   cv::Mat padded;
   int m = cv::getOptimalDFTSize(greyImg.rows);
   int n = cv::getOptimalDFTSize(greyImg.cols);
+  // expand borders of image
   cv::copyMakeBorder(greyImg, padded, 0, m-greyImg.rows, 0, n-greyImg.cols, cv::BORDER_CONSTANT, cv::Scalar::all(0));
+
+  // make place for borh the complex and the real value
   cv::Mat planes[] = {cv::Mat_<float>(padded), cv::Mat::zeros(padded.size(), CV_32F)};
   cv::Mat complexI;
   cv::merge(planes, 2, complexI);
 
+  // make discreate fourier transformation
   cv::dft(complexI, complexI);
 
+  // transform the real and complex values to magnitude
   cv::split(complexI, planes);
   cv::magnitude(planes[0], planes[1], planes[0]);
   cv::Mat magI = planes[0];
 
+  // switch to a logaritmic scale
   magI += cv::Scalar::all(1);
+  log(magI, magI);
 
+  // crop and rearrange image to display spectrum
   magI = magI(cv::Rect(0, 0, magI.cols & -2, magI.rows & -2));
-
   int cx = magI.cols/2;
   int cy = magI.rows/2;
 
@@ -324,13 +356,11 @@ int DFT(cv::Mat img) {
   q2.copyTo(q1);
   tmp.copyTo(q2);
 
-  cv::normalize(magI, magI, 0, 1, cv::NORM_MINMAX);
-  // HOW TO CROP IMAGE SO IT SHOWS ONLY INTERESTING PART OF SPECTRUM
-  cv::Mat zoom;
-  cv::pyrUp(magI, zoom, cv::Size(magI.cols * 2, magI.rows * 2));
-
-  cv::imshow("Input Image", img);
-  cv::imshow("spectrum magnitude", zoom);
-  cv::waitKey();
-  return 0;
+  // magnitudes are out of image range, need to normalize it
+  normalize(magI, magI, 0, 1, cv::NORM_MINMAX);
+  //
+  // cv::imshow("Input Image", img);
+  // cv::imshow("spectrum magnitude", magI);
+  // cv::waitKey();
+  return magI;
 }
