@@ -155,7 +155,7 @@ int compareImages(std::vector<std::string> paths) {
 
       // check just images of one iris ==
       // check just images of different iris !=
-      if ( paths[i].substr(0,paths[i].size()-16) != paths[j].substr(0,paths[j].size()-16) ) {
+      if ( paths[i].substr(0,paths[i].size()-16) == paths[j].substr(0,paths[j].size()-16) ) {
         continue;
       }
       cv::Mat img1 = cv::imread(paths[i]);
@@ -252,11 +252,17 @@ int compareVectors(cv::Mat img1, cv::Mat img2) {
 
   vectorDiff(V1, V2, maxDiff, averageDiff, sumDiff);
 
-  if (maxDiff > 30 && averageDiff > 30) {
-      std::cout << maxDiff << " " << averageDiff << std::endl;
-      cv::imshow("emg1", img1);
-      cv::imshow("img2", img2);
-      plot(V1, V2);
+  // if (maxDiff > 50) {
+  //     std::cout << "maxDiff: " << maxDiff << std::endl;
+  //     cv::imshow("emg1", img1);
+  //     cv::imshow("img2", img2);
+  //     plot(V1, V2);
+  // } else
+  if (averageDiff < 33) {
+    std::cout << "averageDiff: " << averageDiff << std::endl;
+    cv::imshow("emg1", img1);
+    cv::imshow("img2", img2);
+    plot(V1, V2);
   }
 }
 
