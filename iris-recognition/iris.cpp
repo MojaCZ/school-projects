@@ -5,16 +5,20 @@
 #include <opencv2/imgproc.hpp>
 #include <dirent.h>
 #include <unistd.h>
-#include <sys/types.h>
-#include <iomanip>
+// #include <sys/types.h>
+// #include <iomanip>
 
 int showDiff(cv::Mat, cv::Mat);
 std::vector<std::string> loadDir(std::string);
 int compareImages(std::vector<std::string>);
 int compareHistograms(cv::Mat, cv::Mat);
+
+int compareVectors(cv::Mat, cv::Mat);
 std::vector<int> vecFromImg(cv::Mat, int);
 std::vector<int> flWindow(std::vector<int>, int);
 std::vector<int> scaleVector(std::vector<int>, int);
+int vectorDiff(std::vector<int>, std::vector<int>, int&, int&, int&);
+
 int plot(std::vector<int>, std::vector<int>);
 int plotVectorToImg(cv::Mat, std::vector<int>, int, int, cv::Vec3b);
 cv::Mat DFT(cv::Mat);
@@ -25,7 +29,7 @@ int main(int argc, char const *argv[]) {
 
   std::vector<std::string> paths;
   paths = loadDir("/irises_MICHE_iPhone5_norm/");
-  // compareImages(paths);
+  compareImages(paths);
 
   const int WINDOW = 50;
 
@@ -40,8 +44,8 @@ int main(int argc, char const *argv[]) {
   }
 
   // image2 = cv::imread("irises_MICHE_iPhone5_norm/004_IP5_OU_F_LI_01_1.iris.norm.png");
-  image2 = cv::imread("irises_MICHE_iPhone5_norm/008_IP5_IN_R_LI_01_1.iris.norm.png");
-  // image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
+  // image2 = cv::imread("irises_MICHE_iPhone5_norm/008_IP5_IN_R_LI_01_1.iris.norm.png");
+  image2 = cv::imread("irises_MICHE_iPhone5_norm/001_IP5_IN_F_RI_01_2.iris.norm.png");
   if (! image2.data) {
     std::cout << "Could not open or find image2" << std::endl;
     return -1;
@@ -63,26 +67,18 @@ int main(int argc, char const *argv[]) {
 
   // >>> COMPARE HISTOGRAMS OF IMAGES:
 
-  compareHistograms(image1, image2);
+  // compareHistograms(image1, image2);
 
   // >>> COMPARE BY FLOATING WINDOWS METHOD
   // load vectors from images
-  std::vector<int> V1, V2;
-  V1 = vecFromImg(image1, 10);
-  V2 = vecFromImg(image2, 10);
 
-  // smoothing graph
-  for (int i=0; i<3; i++) {
-    V1 = flWindow(V1, 100);
-    V2 = flWindow(V2, 100);
-  }
-  plot(V1, V2);
+  // compareVectors(image1, image2);
 
 
   // >>> DISPLAY IMAGES
-  cv::imshow("image1", image1);
-  cv::imshow("image2", image2);
-  cv::waitKey(0);
+  // cv::imshow("image1", image1);
+  // cv::imshow("image2", image2);
+  // cv::waitKey(0);
 
   return 0;
 }
@@ -157,8 +153,9 @@ int compareImages(std::vector<std::string> paths) {
   for (int i=0; i<paths.size(); i++) {  //paths.size()
     for (int j=i+1; j<paths.size(); j++) {  //paths.size()
 
-      // check just images of one iris
-      if ( paths[i].substr(0,paths[i].size()-16) == paths[j].substr(0,paths[j].size()-16) ) {
+      // check just images of one iris ==
+      // check just images of different iris !=
+      if ( paths[i].substr(0,paths[i].size()-16) != paths[j].substr(0,paths[j].size()-16) ) {
         continue;
       }
       cv::Mat img1 = cv::imread(paths[i]);
@@ -171,25 +168,10 @@ int compareImages(std::vector<std::string> paths) {
         std::cout << "Could not open or find image2" << std::endl;
         return -1;
       }
-      if (paths[i].substr(73, 18) == paths[j].substr(73, 18)) {
-        std::cout << "AHOOOOJ\n";
-      }
-      std::cout << paths[i].substr(73, 20)  << " VS " << paths[j].substr(73, 20) << std::endl;
 
-      // IF IMAGE PASSED HISTOGRAM TEST, RUN FLOATING WINDOW TEST
-      if (compareHistograms(img1, img2) >= 4) {
-        // >>> COMPARE BY FLOATING WINDOWS METHOD
-        // load vectors from images
-        std::vector<int> V1, V2;
-        V1 = vecFromImg(img1, 25);
-        V2 = vecFromImg(img2, 25);
+      compareVectors(img1, img2);
+      // std::cout << paths[i].substr(73, 20)  << " VS " << paths[j].substr(73, 20) << std::endl;
 
-        // smoothing graph
-        V1 = flWindow(V1, 200);
-        V2 = flWindow(V2, 200);
-
-        plot(V1, V2);
-      }
     }
   }
 }
@@ -254,6 +236,50 @@ int compareHistograms(cv::Mat img1, cv::Mat img2) {
   return passes;
 }
 
+// compareVectors is function running vector comparison method on two given images
+int compareVectors(cv::Mat img1, cv::Mat img2) {
+  std::vector<int> V1, V2;
+  V1 = vecFromImg(img1, 10);
+  V2 = vecFromImg(img2, 10);
+
+  // smoothing graph
+  for (int i=0; i<3; i++) {
+    V1 = flWindow(V1, 100);
+    V2 = flWindow(V2, 100);
+  }
+
+  int maxDiff, sumDiff, averageDiff = 0;
+
+  vectorDiff(V1, V2, maxDiff, averageDiff, sumDiff);
+
+  if (maxDiff > 30 && averageDiff > 30) {
+      std::cout << maxDiff << " " << averageDiff << std::endl;
+      cv::imshow("emg1", img1);
+      cv::imshow("img2", img2);
+      plot(V1, V2);
+  }
+}
+
+// vectorDiff wil loop through all
+int vectorDiff(std::vector<int> V1, std::vector<int> V2, int &maxDiff, int &averageDiff, int &sumDiff) {
+  if (V1.size() != V2.size()) {
+    std::cout << "vectors are not same" << std::endl;
+    return 0;
+  }
+
+  maxDiff = 0;
+  sumDiff = 0;
+  for (int i=0; i<V1.size(); i++) {
+    int diff = abs(V1[i] - V2[i]);
+    sumDiff += diff;
+    if (diff > maxDiff) {
+      maxDiff = diff;
+    }
+  }
+  averageDiff = sumDiff / V1.size();
+  std::cout << "maxDiff: " << maxDiff << " sumDiff: " << sumDiff << " averageDiff: " << averageDiff << std::endl;
+}
+
 // vecFromImg runs square window through image and get average value from every window position
 // return vector of averageas
 std::vector<int> vecFromImg(cv::Mat img, int window) {
@@ -283,6 +309,7 @@ std::vector<int> vecFromImg(cv::Mat img, int window) {
   }
   return V;
 };
+
 
 // plot will make adjustments on vectors and call plot function to write pixels to image
 // just graphical representation
